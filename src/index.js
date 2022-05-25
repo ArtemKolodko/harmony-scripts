@@ -1,45 +1,5 @@
-const axios = require('axios')
-const JSONBigInt = require('json-bigint')({'storeAsString': true})
-const csv = require('csv-parser');
 const fs = require('fs');
-const Web3 =  require("web3");
-
-const web3 = new Web3('https://a.api.s0.t.hmny.io');
-
-const getBalance = async (address) => {
-    const data = await axios.post('https://api.s0.t.hmny.io', {
-        "id": "1",
-        "jsonrpc": "2.0",
-        "method": "hmyv2_getBalance",
-        "params": [
-            address
-        ]
-    },
-        { transformResponse: (response) => JSONBigInt.parse(response)}
-    )
-    return data.data.result
-}
-
-const getOwners = (abi, address) => {
-    let contract = new web3.eth.Contract(abi, address);
-    return contract.methods.getOwners().call();
-}
-
-function readCsv(filename){
-    const lines = []
-    return new Promise((resolve, reject) => {
-        fs.createReadStream(filename)
-            .pipe(csv())
-            .on('data', (row) => {
-                lines.push(row)
-            })
-            .on('end', () => {
-                resolve(lines);
-            })
-            .on('error', reject)
-    })
-
-}
+const { readCsv, getBalance, getOwners } = require('./utils')
 
 const sleep = (timeout) => new Promise(resolve => setTimeout(resolve, timeout))
 
