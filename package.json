@@ -1,11 +1,11 @@
 {
-  "name": "multisig-balances",
+  "name": "harmony-scripts",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "multisig": "node run src/index"
+    "multisig_balances": "node run src/multisig_balances",
+    "multisig_erc20_balances": "node run src/multisig_erc20_balances"
   },
   "keywords": [],
   "author": "",
@@ -13,6 +13,7 @@
   "dependencies": {
     "axios": "^0.27.2",
     "csv-parser": "^3.0.0",
+    "csv-writer": "^1.6.0",
     "json-bigint": "^1.0.0",
     "web3": "^1.7.3"
   }

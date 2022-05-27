@@ -1,28 +1,21 @@
-const fs = require('fs');
-const { readCsv, getBalance, getOwners } = require('./utils')
-
-const sleep = (timeout) => new Promise(resolve => setTimeout(resolve, timeout))
+const { readCsv, getOneBalance, getGnosisSafeOwners, sleep } = require('./utils')
 
 const start = async () => {
-    const csvLines = await readCsv('multisig-addresses.csv')
+    const csvLines = await readCsv('./assets/multisig-addresses.csv')
     const addresses = csvLines.map(line => line.address)
     console.log('Safes count:', addresses.length)
-
-    let rawAbi = fs.readFileSync('GnosisSafeAbi.json');
-    let gnosisSafeAbi = JSON.parse(rawAbi);
+    console.log('Start counting balances...')
 
     let totalBalance = BigInt(0)
     const ownersSet = new Set()
-    const ownersArray = []
     try {
         for(let i=0; i < addresses.length; i++) {
             const address = addresses[i]
-            const balance = await getBalance(address)
+            const balance = await getOneBalance(address)
             totalBalance = BigInt(totalBalance) + BigInt(balance)
 
-            const owners = await getOwners(gnosisSafeAbi, address)
+            const owners = await getGnosisSafeOwners(address)
             owners.forEach((owner) => {
-                ownersArray.push(owner)
                 ownersSet.add(owner)
             })
 
@@ -38,7 +31,6 @@ const start = async () => {
 
     console.log('Total balance', totalBalance.toString())
     console.log('Unique owners', ownersSet.size)
-    console.log('Total owners', ownersArray.length)
 }
 
 start()
