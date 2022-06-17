@@ -4,17 +4,21 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "multisig_balances": "node run src/multisig_balances",
-    "multisig_erc20_balances": "node run src/multisig_erc20_balances"
+    "multisig_balances": "node src/multisig_balances",
+    "multisig_erc20_balances": "node src/multisig_erc20_balances",
+    "multisig_staking": "node src/multisig_staking"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "axios": "^0.27.2",
+    "bignumber.js": "^9.0.2",
     "csv-parser": "^3.0.0",
     "csv-writer": "^1.6.0",
+    "dotenv": "^16.0.1",
     "json-bigint": "^1.0.0",
+    "pg": "^8.7.3",
     "web3": "^1.7.3"
   }
 }
