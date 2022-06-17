@@ -94,7 +94,7 @@ const start = async () => {
     console.log(`Received ${safeAddresses.length} addresses, start retrieving balances...`)
     const  { delegated, undelegated, reward } = await getAddressesStats(safeAddresses)
     console.log('Safes count:', safeAddresses.length)
-    console.log(`Total delegated: ${delegated}, undelegated: ${undelegated}, reward: ${reward}`)
+    console.log(`Total delegated: ${delegated}, pending undelegations: ${undelegated}, reward: ${reward}`)
 }
 
 start()
