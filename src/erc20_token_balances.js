@@ -9,6 +9,11 @@ const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 const erc20AbiRaw = fs.readFileSync('src/assets/ERC20ABI.json');
 const erc20AbiManager = ABIManager(JSON.parse(erc20AbiRaw))
 
+const settings = {
+    balancesBatchSize: parseInt(process.env.BALANCES_BATCH_SIZE || '100'),
+    sleepBetweenBatches: parseInt(process.env.SLEEP_BETWEEN_BATCHES || '1000'),
+}
+
 const dbParams = {
     host: process.env.PG_HOST || 'localhost',
     user: process.env.PG_USER || 'postgres',
@@ -70,15 +75,15 @@ const runPromisesWithRetry = async (promises, retryCount = 1) => {
         const data = await Promise.all(promises)
         return data
     } catch (e) {
-        console.log('Promise failed: ',e.message, ', retries: ', retryCount, ', sleep 1s')
-        await sleep(1000)
+        console.log('Promise failed: ',e.message, ', retries: ', retryCount, 'sleep: ', retryCount, 's')
+        await sleep(retryCount * 1000)
         return await runPromisesWithRetry(promises, retryCount + 1)
     }
 }
 
 const getHoldersBalancesAtBlock = async (tokenAddress, userAddresses, blockNumber) => {
     const accounts = []
-    const chunks = arrayChunk(userAddresses, 100)
+    const chunks = arrayChunk(userAddresses, settings.balancesBatchSize)
 
     for(let i=0; i < chunks.length; i++) {
         const chunk = chunks[i]
@@ -86,6 +91,7 @@ const getHoldersBalancesAtBlock = async (tokenAddress, userAddresses, blockNumbe
         const data = await runPromisesWithRetry(promises)
         accounts.push(...data)
         console.log(`Received ${data.length} balances, received total balances: ${accounts.length}`)
+        await sleep(settings.sleepBetweenBatches)
     }
     return accounts
 }
@@ -113,6 +119,7 @@ const writeHoldersToCsv = async (holders, filename) => {
 }
 
 const start = async () => {
+    console.log('settings: ', settings)
     console.log('Trying to establish explorer DB connection...', dbParams)
     const client = new Client(dbParams)
     await client.connect()
