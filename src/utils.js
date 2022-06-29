@@ -3,6 +3,7 @@ const fs = require("fs");
 const csv = require("csv-parser");
 const Web3 = require("web3");
 const JSONBigInt = require('json-bigint')
+require('dotenv').config()
 
 const RPC_API_URL = 'https://a.api.s0.t.hmny.io'
 const EXPLORER_API_URL = 'http://api1.explorer.t.hmny.io:3000'
@@ -31,7 +32,7 @@ const getOneBalance = async (address) => {
     return data.data.result
 }
 
-const hmyCall = async (callParams, blockNumber = 'latest') => {
+const hmyCall = async (callParams, blockNumber) => {
     const data = await axios.post(RPC_API_URL, {
             "id": "1",
             "jsonrpc": "2.0",
@@ -101,6 +102,13 @@ const readCsv = (filename) => {
 
 const sleep = (timeout) => new Promise(resolve => setTimeout(resolve, timeout))
 
+const arrayChunk = (arr, chunkSize) => {
+    if (chunkSize <= 0) throw 'Invalid chunk size'
+    let R = []
+    for (let i = 0, len = arr.length; i < len; i += chunkSize) R.push(arr.slice(i, i + chunkSize))
+    return R
+}
+
 module.exports = {
     readCsv,
     getLatestBlockNumber,
@@ -112,4 +120,5 @@ module.exports = {
     getAllErc20,
     sleep,
     hmyCall,
+    arrayChunk
 }
