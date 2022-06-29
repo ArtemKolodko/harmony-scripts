@@ -23,10 +23,22 @@ const dbParams = {
 }
 
 const TargetBlockNumber = parseInt(process.env.BLOCK_NUMBER || '0')
-const ERC20TokensList = [{
-    name: '1ETH',
-    address: '0x6983D1E6DEf3690C4d616b13597A09e6193EA013',
-}]
+const ERC20TokensList = [
+    { name: '1ETH', address: '0x6983D1E6DEf3690C4d616b13597A09e6193EA013'},
+    { name: '1USDC', address: '0x985458E523dB3d53125813eD68c274899e9DfAb4'},
+    { name: '1WBTC', address: '0x3095c7557bCb296ccc6e363DE01b760bA031F2d9'},
+    { name: '1USDT', address: '0x3C2B8Be99c50593081EAA2A724F0B8285F5aba8f'},
+    { name: '1DAI', address: '0xEf977d2f931C1978Db5F6747666fa1eACB0d0339'},
+    { name: '1BUSD', address: '0xE176EBE47d621b984a73036B9DA5d834411ef734'},
+    { name: '1AAG', address: '0xAE0609A062a4eAED49dE28C5f6A193261E0150eA'},
+    { name: '1FXS', address: '0x775d7816afbEf935ea9c21a3aC9972F269A39004'},
+    { name: '1SUSHI', address: '0xBEC775Cb42AbFa4288dE81F387a9b1A3c4Bc552A'},
+    { name: '1AAVE', address: '0xcF323Aad9E522B93F11c352CaA519Ad0E14eB40F'},
+    { name: '1WETH', address: '0xF720b7910C6b2FF5bd167171aDa211E226740bfe'},
+    { name: '1FRAX', address: '0xeB6C08ccB4421b6088e581ce04fcFBed15893aC3'},
+    { name: 'bscBNB', address: '0xb1f6E61E1e113625593a22fa6aa94F8052bc39E0'},
+    { name: 'bscBUSD', address: '0x0aB43550A6915F9f67d0c454C2E90385E6497EaA'},
+]
 
 const getTokenHolders = async (client, tokenAddress, offset = 0, limit = 10000) => {
     const { rows } = await client.query(`
@@ -58,6 +70,8 @@ const getAllTokenHolders = async (client, tokenAddress) => {
     }
 
     return addresses
+    // const json = fs.readFileSync(`src/assets/holders_${tokenAddress}_block_${TargetBlockNumber}.csv`);
+    // return JSON.parse(json)
 }
 
 const getUserBalance = async (tokenAddress, userAddress, blockNumber) => {
@@ -75,7 +89,7 @@ const runPromisesWithRetry = async (promises, retryCount = 1) => {
         const data = await Promise.all(promises)
         return data
     } catch (e) {
-        const sleepTimeout = retryCount * 2
+        const sleepTimeout = 30
         console.log('Promise failed: ',e.message, ', retries: ', retryCount, 'sleep: ', sleepTimeout, 's')
         await sleep(sleepTimeout * 1000)
         return await runPromisesWithRetry(promises, retryCount + 1)
