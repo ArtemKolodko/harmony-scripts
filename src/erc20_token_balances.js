@@ -75,8 +75,9 @@ const runPromisesWithRetry = async (promises, retryCount = 1) => {
         const data = await Promise.all(promises)
         return data
     } catch (e) {
-        console.log('Promise failed: ',e.message, ', retries: ', retryCount, 'sleep: ', retryCount, 's')
-        await sleep(retryCount * 1000)
+        const sleepTimeout = retryCount * 2
+        console.log('Promise failed: ',e.message, ', retries: ', retryCount, 'sleep: ', sleepTimeout, 's')
+        await sleep(sleepTimeout * 1000)
         return await runPromisesWithRetry(promises, retryCount + 1)
     }
 }
