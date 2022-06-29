@@ -9,10 +9,10 @@ const EXPLORER_API_URL = 'http://api1.explorer.t.hmny.io:3000'
 
 const web3 = new Web3(RPC_API_URL);
 
-const safeAbiRaw = fs.readFileSync('./assets/GnosisSafeABI.json');
+const safeAbiRaw = fs.readFileSync('src/assets/GnosisSafeABI.json');
 const GnosisSafeAbi = JSON.parse(safeAbiRaw);
 
-const erc20AbiRaw = fs.readFileSync('./assets/ERC20ABI.json');
+const erc20AbiRaw = fs.readFileSync('src/assets/ERC20ABI.json');
 const ERC20ABI = JSON.parse(erc20AbiRaw);
 
 const getOneBalance = async (address) => {
@@ -29,6 +29,34 @@ const getOneBalance = async (address) => {
         }
     )
     return data.data.result
+}
+
+const hmyCall = async (callParams, blockNumber = 'latest') => {
+    const data = await axios.post(RPC_API_URL, {
+            "id": "1",
+            "jsonrpc": "2.0",
+            "method": "hmy_call",
+            "params": [
+                callParams,
+                blockNumber
+            ]
+        },
+        {
+            transformResponse: (response) => JSONBigInt({ storeAsString: true }).parse(response)
+        }
+    )
+    return data.data.result
+}
+
+const getLatestBlockNumber = async () => {
+    const data = await axios.post(RPC_API_URL, {
+            "id": "1",
+            "jsonrpc": "2.0",
+            "method": "hmy_blockNumber",
+            "params": []
+        }
+    )
+    return parseInt(data.data.result, 16)
 }
 
 const getGnosisSafeOwners = (address) => {
@@ -75,11 +103,13 @@ const sleep = (timeout) => new Promise(resolve => setTimeout(resolve, timeout))
 
 module.exports = {
     readCsv,
+    getLatestBlockNumber,
     getOneBalance,
     getERC20Balance,
     getGnosisSafeOwners,
     getAddressErc20Tokens,
     getBridgeTokens,
     getAllErc20,
-    sleep
+    sleep,
+    hmyCall,
 }

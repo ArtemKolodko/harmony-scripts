@@ -2,11 +2,12 @@
   "name": "harmony-scripts",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "",
   "scripts": {
     "multisig_balances": "node src/multisig_balances",
     "multisig_erc20_balances": "node src/multisig_erc20_balances",
-    "multisig_staking": "node src/multisig_staking"
+    "multisig_staking": "node src/multisig_staking",
+    "erc20": "node ./src/erc20_token_balances"
   },
   "keywords": [],
   "author": "",
@@ -19,6 +20,6 @@
     "dotenv": "^16.0.1",
     "json-bigint": "^1.0.0",
     "pg": "^8.7.3",
-    "web3": "^1.7.3"
+    "web3": "^1.7.4"
   }
 }
