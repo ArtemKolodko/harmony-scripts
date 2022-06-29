@@ -5,7 +5,7 @@ const Web3 = require("web3");
 const JSONBigInt = require('json-bigint')
 require('dotenv').config()
 
-const RPC_API_URL = 'https://a.api.s0.t.hmny.io'
+const RPC_API_URL = process.env.RPC_API_URL || 'https://a.api.s0.t.hmny.io'
 const EXPLORER_API_URL = 'http://api1.explorer.t.hmny.io:3000'
 
 const web3 = new Web3(RPC_API_URL);
