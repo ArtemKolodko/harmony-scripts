@@ -1,10 +1,13 @@
 require('dotenv').config()
+const moment = require('moment');
 const { Client } = require('pg')
 const BigNumber = require('bignumber.js')
 const fs = require("fs");
 const {ABIManager} = require("./ABIManager");
 const {arrayChunk, sleep} = require("./utils");
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
+
+BigNumber.config({ DECIMAL_PLACES: 20, EXPONENTIAL_AT: 20 })
 
 const erc20AbiRaw = fs.readFileSync('src/assets/ERC20ABI.json');
 const erc20AbiManager = ABIManager(JSON.parse(erc20AbiRaw))
@@ -70,18 +73,24 @@ const getAllTokenHolders = async (client, tokenAddress) => {
     }
 
     return addresses
-    // const json = fs.readFileSync(`src/assets/holders_${tokenAddress}_block_${TargetBlockNumber}.csv`);
+    // const json = fs.readFileSync(`src/assets/holders/holders_${tokenAddress}_block_28115058.csv`);
     // return JSON.parse(json)
 }
 
-const getUserBalance = async (tokenAddress, userAddress, blockNumber) => {
+const getUserBalance = async (tokenAddress, tokenDecimals, userAddress, blockNumber) => {
     const balance = await erc20AbiManager.call('balanceOf', [userAddress], tokenAddress, blockNumber)
-    return {
-        token: tokenAddress,
-        address: userAddress,
-        amount: balance,
-        blockNumber
+    let balanceFormatted = new BigNumber(balance).dividedBy(Math.pow(10, tokenDecimals))
+    if (balanceFormatted.isGreaterThan(new BigNumber('1'))) {
+        balanceFormatted = balanceFormatted.decimalPlaces(4)
     }
+    return {
+        address: userAddress,
+        balance: balanceFormatted.toString(10),
+    }
+}
+
+const getTokenDecimals = (tokenAddress) => {
+    return erc20AbiManager.call('decimals', [], tokenAddress, 'latest')
 }
 
 const runPromisesWithRetry = async (promises, retryCount = 1) => {
@@ -96,16 +105,17 @@ const runPromisesWithRetry = async (promises, retryCount = 1) => {
     }
 }
 
-const getHoldersBalancesAtBlock = async (tokenAddress, userAddresses, blockNumber) => {
+const getHoldersBalancesAtBlock = async (tokenAddress, tokenDecimals, userAddresses, blockNumber) => {
     const accounts = []
     const chunks = arrayChunk(userAddresses, settings.balancesBatchSize)
 
     for(let i=0; i < chunks.length; i++) {
         const chunk = chunks[i]
-        const promises = chunk.map((userAddress) => getUserBalance(tokenAddress, userAddress, blockNumber))
+        const promises = chunk.map((userAddress) => getUserBalance(tokenAddress, tokenDecimals, userAddress, blockNumber))
         const data = await runPromisesWithRetry(promises)
-        accounts.push(...data)
-        console.log(`Received ${data.length} balances, received total balances: ${accounts.length}`)
+        const positiveBalances = data.filter(item => +item.balance > 0)
+        accounts.push(...positiveBalances)
+        console.log(`Received ${positiveBalances.length} positive balances, total positive balances: ${accounts.length}, total balances checked: ${settings.balancesBatchSize * (i + 1)}`)
         await sleep(settings.sleepBetweenBatches)
     }
     return accounts
@@ -123,10 +133,8 @@ const writeHoldersToCsv = async (holders, filename) => {
     const csvWriter = createCsvWriter({
         path: filename,
         header: [
-            {id: 'token', title: 'Token'},
             {id: 'address', title: 'Address'},
-            {id: 'amount', title: 'Amount'},
-            {id: 'blockNumber', title: 'BlockNumber'},
+            {id: 'balance', title: 'Balance'},
         ]
     });
     await upsertFile(filename)
@@ -141,7 +149,7 @@ const start = async () => {
 
     console.log('Connected')
 
-    const reportsFolder = './reports/erc20_' + Date.now()
+    const reportsFolder = './reports/erc20_' + moment().format()
     fs.mkdirSync(reportsFolder, { recursive: true });
 
     for(let i=0; i < ERC20TokensList.length; i++) {
@@ -149,14 +157,15 @@ const start = async () => {
         const tokenAddress = token.address.toLowerCase()
         try {
             console.log(`${token.name}: getting holders list from DB`)
-            const holders = await getAllTokenHolders(client, tokenAddress)
+            const holders = await getAllTokenHolders(client, token.name)
             console.log(`${token.name}: found ${holders.length} holders in DB`)
 
             console.log(`${token.name}: start updating balances at block "${TargetBlockNumber}"`)
-            const holdersWithBalances = await getHoldersBalancesAtBlock(tokenAddress, holders, TargetBlockNumber)
-            const reportFileName = `${reportsFolder}/token_${token.name}_block_${TargetBlockNumber}.csv`
+            const decimals = await getTokenDecimals(tokenAddress)
+            const holdersWithBalances = await getHoldersBalancesAtBlock(tokenAddress, decimals, holders, TargetBlockNumber)
+            const reportFileName = `${reportsFolder}/token_${token.address}_block_${TargetBlockNumber}.csv`
             await writeHoldersToCsv(holdersWithBalances, reportFileName)
-            console.log(`Report ${reportFileName} created`)
+            console.log(`${token.name}: report ${reportFileName} created`)
         } catch (e) {
             console.log('Cannot get ', token.name, 'holders: ', e.message)
         }
