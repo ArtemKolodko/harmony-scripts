@@ -109,6 +109,14 @@ const arrayChunk = (arr, chunkSize) => {
     return R
 }
 
+const upsertFile = async (name) => {
+    try {
+        await fs.promises.readFile(name)
+    } catch (error) {
+        await fs.promises.writeFile(name, '')
+    }
+}
+
 module.exports = {
     readCsv,
     getLatestBlockNumber,
@@ -120,5 +128,6 @@ module.exports = {
     getAllErc20,
     sleep,
     hmyCall,
-    arrayChunk
+    arrayChunk,
+    upsertFile
 }

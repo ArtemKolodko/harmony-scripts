@@ -7,7 +7,8 @@
     "multisig_balances": "node src/multisig_balances",
     "multisig_erc20_balances": "node src/multisig_erc20_balances",
     "multisig_staking": "node src/multisig_staking",
-    "erc20": "node ./src/erc20_token_balances"
+    "erc20": "node ./src/erc20_token_balances",
+    "erc20_filter": "node ./src/erc20_filtered_report"
   },
   "keywords": [],
   "author": "",
