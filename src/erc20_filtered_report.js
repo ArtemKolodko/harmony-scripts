@@ -110,8 +110,8 @@ const start = async () => {
         .filter(user => {
             const usdBlockFrom = user[`Balance_USD_${BLOCK_FROM}`]
             const usdBlockTo = user[`Balance_USD_${BLOCK_TO}`]
-            return usdBlockFrom >= BALANCE_RANGE_FROM && usdBlockFrom <= BALANCE_RANGE_TO &&
-                usdBlockTo >= BALANCE_RANGE_FROM && usdBlockTo <= BALANCE_RANGE_TO
+            return usdBlockFrom >= BALANCE_RANGE_FROM && usdBlockFrom < BALANCE_RANGE_TO &&
+                usdBlockTo >= BALANCE_RANGE_FROM && usdBlockTo < BALANCE_RANGE_TO
         })
 
         console.log(`${token.name}: stayed addresses ${stayedUsers.length}, stayed with balances $${BALANCE_RANGE_FROM} - $${BALANCE_RANGE_TO}: ${stayedWithBalances.length}`)
