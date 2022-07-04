@@ -36,6 +36,10 @@ const getErc20MapWithPrice = async () => {
         if (token.address.toLowerCase() === '0x0aB43550A6915F9f67d0c454C2E90385E6497EaA'.toLowerCase()) {
             usdPrice = 1
         }
+        // https://coinmarketcap.com/currencies/aag-ventures/
+        if (token.address.toLowerCase() === '0xAE0609A062a4eAED49dE28C5f6A193261E0150eA'.toLowerCase()) {
+            usdPrice = 0.008072
+        }
         console.log(`${token.name} price = $${usdPrice}`)
         erc20Map[token.address] = {
             ...token,
