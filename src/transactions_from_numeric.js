@@ -26,7 +26,7 @@ const getAddresses = async (limit = 500) => {
     return rows
 }
 
-const getRelatedTxs = async (property, value, offset = 0, limit = 100) => {
+const getRelatedTxs = async (property, value, offset = 0, limit = 1000) => {
     const { rows } = await client.query(`
         select * from transactions
         where "${property}" = $1
@@ -44,7 +44,7 @@ const start = async () => {
 
     console.log('Connected')
 
-    const addresses = await getAddresses(10000)
+    const addresses = await getAddresses(5000)
     console.log('Addresses count: ', addresses.length)
 
     let totalTimeString = 0
@@ -52,13 +52,15 @@ const start = async () => {
 
     const getRelatedStringTime = async (address) => {
         const timeStart = Date.now()
-        await getRelatedTxs('from', address)
+        const rows = await getRelatedTxs('from', address)
+        await getRelatedTxs('from', address, Math.floor(rows.length / 2))
         return Date.now() - timeStart
     }
 
     const getRelatedIntegerTime = async (id) => {
         const timeStart = Date.now()
-        await getRelatedTxs('from_int', id)
+        const rows = await getRelatedTxs('from_int', id)
+        await getRelatedTxs('from_int', id, Math.floor(rows.length / 2))
         return Date.now() - timeStart
     }
 

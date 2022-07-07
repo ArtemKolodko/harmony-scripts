@@ -2,6 +2,9 @@ const { getBridgeTokens, readCsv, upsertFile} = require('./utils')
 const {createObjectCsvWriter: createCsvWriter} = require("csv-writer");
 const moment = require("moment");
 const fs = require("fs");
+const BigNumber = require("bignumber.js");
+
+BigNumber.config({ DECIMAL_PLACES: 30, EXPONENTIAL_AT: 30 })
 
 const ERC20TokensList = [
     { name: '1ETH', address: '0x6983D1E6DEf3690C4d616b13597A09e6193EA013'},
@@ -21,9 +24,9 @@ const ERC20TokensList = [
 ]
 
 const BLOCK_FROM = 28115058
-const BLOCK_TO = 28324354
-const BALANCE_RANGE_FROM = 100
-const BALANCE_RANGE_TO = 10000
+const BLOCK_TO = 28432800
+const BALANCE_RANGE_FROM = 0
+const BALANCE_RANGE_TO = 1000000000
 
 const getErc20MapWithPrice = async () => {
     const erc20Map = {}
@@ -38,9 +41,17 @@ const getErc20MapWithPrice = async () => {
         }
         // https://coinmarketcap.com/currencies/aag-ventures/
         if (token.address.toLowerCase() === '0xAE0609A062a4eAED49dE28C5f6A193261E0150eA'.toLowerCase()) {
-            usdPrice = 0.008072
+            usdPrice = 0.006797
         }
-        console.log(`${token.name} price = $${usdPrice}`)
+        // 1DAI
+        if (token.address.toLowerCase() === '0xEf977d2f931C1978Db5F6747666fa1eACB0d0339'.toLowerCase()) {
+            usdPrice = 1
+        }
+        console.log(`${token.name} price = $${+usdPrice}`)
+        if (+usdPrice === 0) {
+            console.log('EXIT: token price = 0')
+            process.exit(1)
+        }
         erc20Map[token.address] = {
             ...token,
             usdPrice: +usdPrice
@@ -63,15 +74,15 @@ const getMatchedUsers = (arr1, arr2, tokenUsdPrice) => {
         .map(user1 => {
             const user2 = arr2.find((user2) => user2.Address === user1.Address)
             const balance1 = user1.Balance
-            const balanceUSD1 = balance1 * tokenUsdPrice
             const balance2 = user2 ? user2.Balance : 0
-            const balanceUSD2 = balance2 * tokenUsdPrice
+            const balanceUSD1 = new BigNumber(balance1).multipliedBy(tokenUsdPrice)
+            const balanceUSD2 = new BigNumber(balance2).multipliedBy(tokenUsdPrice)
             return {
                 Address: user1.Address,
                 [`Balance_${BLOCK_FROM}`]: balance1,
-                [`Balance_USD_${BLOCK_FROM}`]: balanceUSD1,
+                [`Balance_USD_${BLOCK_FROM}`]: balanceUSD1.toString(10),
                 [`Balance_${BLOCK_TO}`]: balance2,
-                [`Balance_USD_${BLOCK_TO}`]: balanceUSD2,
+                [`Balance_USD_${BLOCK_TO}`]: balanceUSD2.toString(10),
             }
         })
         .filter((user) => user[`Balance_${BLOCK_FROM}`] > 0 && user[`Balance_${BLOCK_TO}`] > 0)
@@ -94,7 +105,7 @@ const writeHoldersToCsv = async (holders, filename) => {
 }
 
 const start = async () => {
-    const reportsFolder = `./reports/held_erc20_$${BALANCE_RANGE_FROM}_$${BALANCE_RANGE_TO}_${moment().format()}`
+    const reportsFolder = `./reports/holders_erc20_$${BALANCE_RANGE_FROM}_$${BALANCE_RANGE_TO}_${moment().format()}`
     fs.mkdirSync(reportsFolder, { recursive: true });
 
     const erc20Map = await getErc20MapWithPrice()
@@ -110,13 +121,15 @@ const start = async () => {
         .filter(user => {
             const usdBlockFrom = user[`Balance_USD_${BLOCK_FROM}`]
             const usdBlockTo = user[`Balance_USD_${BLOCK_TO}`]
-            return usdBlockFrom >= BALANCE_RANGE_FROM && usdBlockFrom < BALANCE_RANGE_TO &&
+            const isUserBalanceDecreased = usdBlockFrom > usdBlockTo
+            const usdBalanceInRange = usdBlockFrom >= BALANCE_RANGE_FROM && usdBlockFrom < BALANCE_RANGE_TO &&
                 usdBlockTo >= BALANCE_RANGE_FROM && usdBlockTo < BALANCE_RANGE_TO
+            return usdBalanceInRange
         })
 
         console.log(`${token.name}: stayed addresses ${stayedUsers.length}, stayed with balances $${BALANCE_RANGE_FROM} - $${BALANCE_RANGE_TO}: ${stayedWithBalances.length}`)
 
-        const reportFileName = `${reportsFolder}/token_${token.address}_holders_${BLOCK_FROM}_${BLOCK_TO}.csv`
+        const reportFileName = `${reportsFolder}/token_${token.name}_${token.address}_holders_${BLOCK_FROM}_${BLOCK_TO}.csv`
         await writeHoldersToCsv(stayedWithBalances, reportFileName)
         console.log(`${token.name}: report ${reportFileName} created`)
     }

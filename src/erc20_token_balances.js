@@ -13,8 +13,8 @@ const erc20AbiRaw = fs.readFileSync('src/assets/ERC20ABI.json');
 const erc20AbiManager = ABIManager(JSON.parse(erc20AbiRaw))
 
 const settings = {
-    balancesBatchSize: parseInt(process.env.BALANCES_BATCH_SIZE || '100'),
-    sleepBetweenBatches: parseInt(process.env.SLEEP_BETWEEN_BATCHES || '1000'),
+    balancesBatchSize: parseInt(process.env.BALANCES_BATCH_SIZE || '1000'),
+    sleepBetweenBatches: parseInt(process.env.SLEEP_BETWEEN_BATCHES || '10000'),
 }
 
 const dbParams = {
@@ -54,27 +54,27 @@ const getTokenHolders = async (client, tokenAddress, offset = 0, limit = 10000) 
     return rows
 }
 
-const getAllTokenHolders = async (client, tokenAddress) => {
-    let offset = 0
-    const limit = 10000
-    const addresses = []
-
-    while(true) {
-        const rows = await getTokenHolders(client, tokenAddress, offset, limit)
-        addresses.push(...rows.map(row => row.address))
-        if (rows.length > 0) {
-            offset += limit
-        } else {
-            break
-        }
-        if (offset > 10 * 1000 * 1000) { // Emergency stop
-            break
-        }
-    }
-
-    return addresses
-    // const json = fs.readFileSync(`src/assets/holders/holders_${tokenAddress}_block_28115058.csv`);
-    // return JSON.parse(json)
+const getAllTokenHolders = async (tokenAddress) => {
+    // let offset = 0
+    // const limit = 10000
+    // const addresses = []
+    //
+    // while(true) {
+    //     const rows = await getTokenHolders(client, tokenAddress, offset, limit)
+    //     addresses.push(...rows.map(row => row.address))
+    //     if (rows.length > 0) {
+    //         offset += limit
+    //     } else {
+    //         break
+    //     }
+    //     if (offset > 10 * 1000 * 1000) { // Emergency stop
+    //         break
+    //     }
+    // }
+    //
+    // return addresses
+    const json = fs.readFileSync(`src/assets/holders/holders_${tokenAddress}_block_28115058.csv`);
+    return JSON.parse(json)
 }
 
 const getUserBalance = async (tokenAddress, tokenDecimals, userAddress, blockNumber) => {
@@ -118,7 +118,7 @@ const getHoldersBalancesAtBlock = async (tokenAddress, tokenDecimals, userAddres
         console.log(`Received ${positiveBalances.length} positive balances, total positive balances: ${accounts.length}, total balances checked: ${settings.balancesBatchSize * (i + 1)}`)
         await sleep(settings.sleepBetweenBatches)
     }
-    return accounts
+    return accounts.sort((a, b) => b.balance - a.balance)
 }
 
 const upsertFile = async (name) => {
@@ -144,8 +144,8 @@ const writeHoldersToCsv = async (holders, filename) => {
 const start = async () => {
     console.log('settings: ', settings)
     console.log('Trying to establish explorer DB connection...', dbParams)
-    const client = new Client(dbParams)
-    await client.connect()
+    // const client = new Client(dbParams)
+    // await client.connect()
 
     console.log('Connected')
 
@@ -157,7 +157,7 @@ const start = async () => {
         const tokenAddress = token.address.toLowerCase()
         try {
             console.log(`${token.name}: getting holders list from DB`)
-            const holders = await getAllTokenHolders(client, token.name)
+            const holders = await getAllTokenHolders(token.name)
             console.log(`${token.name}: found ${holders.length} holders in DB`)
 
             console.log(`${token.name}: start updating balances at block "${TargetBlockNumber}"`)
@@ -171,7 +171,7 @@ const start = async () => {
         }
     }
 
-    client.end()
+    // client.end()
 }
 
 start()
