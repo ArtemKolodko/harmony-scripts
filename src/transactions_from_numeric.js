@@ -20,7 +20,7 @@ const client = new Client(dbParams)
 const getAddresses = async (limit = 500) => {
     const { rows } = await client.query(`
         select * from addresses
-        order by address desc
+        ORDER BY RANDOM ()
         limit ${limit}
     `)
     return rows
@@ -44,7 +44,7 @@ const start = async () => {
 
     console.log('Connected')
 
-    const addresses = await getAddresses(5000)
+    const addresses = await getAddresses(10000)
     console.log('Addresses count: ', addresses.length)
 
     let totalTimeString = 0

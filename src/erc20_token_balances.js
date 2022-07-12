@@ -43,37 +43,13 @@ const ERC20TokensList = [
     { name: 'bscBUSD', address: '0x0aB43550A6915F9f67d0c454C2E90385E6497EaA'},
 ]
 
-const getTokenHolders = async (client, tokenAddress, offset = 0, limit = 10000) => {
-    const { rows } = await client.query(`
-        select owner_address as address from public.erc20_balance
-        where token_address = '${tokenAddress}'
-        order by owner_address desc, token_address desc
-        offset ${offset}
-        limit ${limit}
-    `)
-    return rows
+const getAllTokenHolders = async (tokenAddress) => {
+    const json = fs.readFileSync(`src/assets/holders/holders_${tokenAddress}_block_28697138.csv`);
+    return JSON.parse(json)
 }
 
-const getAllTokenHolders = async (tokenAddress) => {
-    // let offset = 0
-    // const limit = 10000
-    // const addresses = []
-    //
-    // while(true) {
-    //     const rows = await getTokenHolders(client, tokenAddress, offset, limit)
-    //     addresses.push(...rows.map(row => row.address))
-    //     if (rows.length > 0) {
-    //         offset += limit
-    //     } else {
-    //         break
-    //     }
-    //     if (offset > 10 * 1000 * 1000) { // Emergency stop
-    //         break
-    //     }
-    // }
-    //
-    // return addresses
-    const json = fs.readFileSync(`src/assets/holders/holders_${tokenAddress}_block_28115058.csv`);
+const readJsonFromFile = async (fileName) => {
+    const json = fs.readFileSync(fileName);
     return JSON.parse(json)
 }
 
@@ -106,26 +82,42 @@ const runPromisesWithRetry = async (promises, retryCount = 1) => {
 }
 
 const getHoldersBalancesAtBlock = async (tokenAddress, tokenDecimals, userAddresses, blockNumber) => {
-    const accounts = []
+    const tempFileName = `./temp/balances_${tokenAddress}.json`
+    await upsertFile(tempFileName, JSON.stringify([]))
+    const accounts = await readJsonFromFile(tempFileName)
+    const allAccounts = [...accounts]
+    if (accounts.length > 0) {
+        console.log(`Found ${accounts.length} balances in temp file ${tempFileName}`)
+    }
+
+    userAddresses = userAddresses.filter(userAddress => !accounts.find(acc => acc.address.toLowerCase() === userAddress.toLowerCase()))
+
+    console.log(`${userAddresses.length} accounts to be updated`)
+
     const chunks = arrayChunk(userAddresses, settings.balancesBatchSize)
 
     for(let i=0; i < chunks.length; i++) {
         const chunk = chunks[i]
         const promises = chunk.map((userAddress) => getUserBalance(tokenAddress, tokenDecimals, userAddress, blockNumber))
-        const data = await runPromisesWithRetry(promises)
+        const data = await Promise.all(promises)
+
+        allAccounts.push(...data)
+        fs.writeFileSync(tempFileName, JSON.stringify(allAccounts))
+
         const positiveBalances = data.filter(item => +item.balance > 0)
         accounts.push(...positiveBalances)
+
         console.log(`Received ${positiveBalances.length} positive balances, total positive balances: ${accounts.length}, total balances checked: ${settings.balancesBatchSize * (i + 1)}`)
         await sleep(settings.sleepBetweenBatches)
     }
     return accounts.sort((a, b) => b.balance - a.balance)
 }
 
-const upsertFile = async (name) => {
+const upsertFile = async (name, content = '') => {
     try {
         await fs.promises.readFile(name)
     } catch (error) {
-        await fs.promises.writeFile(name, '')
+        await fs.promises.writeFile(name, content)
     }
 }
 
@@ -144,8 +136,6 @@ const writeHoldersToCsv = async (holders, filename) => {
 const start = async () => {
     console.log('settings: ', settings)
     console.log('Trying to establish explorer DB connection...', dbParams)
-    // const client = new Client(dbParams)
-    // await client.connect()
 
     console.log('Connected')
 
@@ -156,11 +146,9 @@ const start = async () => {
         const token = ERC20TokensList[i]
         const tokenAddress = token.address.toLowerCase()
         try {
-            console.log(`${token.name}: getting holders list from DB`)
             const holders = await getAllTokenHolders(token.name)
-            console.log(`${token.name}: found ${holders.length} holders in DB`)
+            console.log(`${token.name}: found ${holders.length} holders`)
 
-            console.log(`${token.name}: start updating balances at block "${TargetBlockNumber}"`)
             const decimals = await getTokenDecimals(tokenAddress)
             const holdersWithBalances = await getHoldersBalancesAtBlock(tokenAddress, decimals, holders, TargetBlockNumber)
             const reportFileName = `${reportsFolder}/token_${token.address}_block_${TargetBlockNumber}.csv`
@@ -168,10 +156,9 @@ const start = async () => {
             console.log(`${token.name}: report ${reportFileName} created`)
         } catch (e) {
             console.log('Cannot get ', token.name, 'holders: ', e.message)
+            process.exit(1)
         }
     }
-
-    // client.end()
 }
 
 start()

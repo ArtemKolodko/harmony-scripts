@@ -24,8 +24,8 @@ const ERC20TokensList = [
 ]
 
 const BLOCK_FROM = 28115058
-const BLOCK_TO = 28432800
-const BALANCE_RANGE_FROM = 0
+const BLOCK_TO = 28697000
+const BALANCE_RANGE_FROM = 0.00000001
 const BALANCE_RANGE_TO = 1000000000
 
 const getErc20MapWithPrice = async () => {
