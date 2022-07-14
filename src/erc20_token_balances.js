@@ -1,6 +1,5 @@
 require('dotenv').config()
 const moment = require('moment');
-const { Client } = require('pg')
 const BigNumber = require('bignumber.js')
 const fs = require("fs");
 const {ABIManager} = require("./ABIManager");
@@ -15,14 +14,6 @@ const erc20AbiManager = ABIManager(JSON.parse(erc20AbiRaw))
 const settings = {
     balancesBatchSize: parseInt(process.env.BALANCES_BATCH_SIZE || '1000'),
     sleepBetweenBatches: parseInt(process.env.SLEEP_BETWEEN_BATCHES || '10000'),
-}
-
-const dbParams = {
-    host: process.env.PG_HOST || 'localhost',
-    user: process.env.PG_USER || 'postgres',
-    password: process.env.PG_PASSWORD || '',
-    database: process.env.PG_DATABASE || 'harmony_original',
-    port: process.env.PG_PORT || 5432
 }
 
 const TargetBlockNumber = parseInt(process.env.BLOCK_NUMBER || '0')
@@ -63,6 +54,14 @@ const getUserBalance = async (tokenAddress, tokenDecimals, userAddress, blockNum
         address: userAddress,
         balance: balanceFormatted.toString(10),
     }
+}
+
+const getTotalSupply = async (tokenAddress, blockNumber = 'latest', tokenDecimals = 0) => {
+    let supply = await erc20AbiManager.call('totalSupply', [], tokenAddress, blockNumber)
+    if (tokenDecimals) {
+        return new BigNumber(supply).div(Math.pow(10, tokenDecimals)).toString(10)
+    }
+    return supply
 }
 
 const getTokenDecimals = (tokenAddress) => {
@@ -135,11 +134,7 @@ const writeHoldersToCsv = async (holders, filename) => {
 
 const start = async () => {
     console.log('settings: ', settings)
-    console.log('Trying to establish explorer DB connection...', dbParams)
-
-    console.log('Connected')
-
-    const reportsFolder = './reports/erc20_' + moment().format()
+    const reportsFolder = './reports/balances_erc20_' + moment().format()
     fs.mkdirSync(reportsFolder, { recursive: true });
 
     for(let i=0; i < ERC20TokensList.length; i++) {
@@ -150,7 +145,13 @@ const start = async () => {
             console.log(`${token.name}: found ${holders.length} holders`)
 
             const decimals = await getTokenDecimals(tokenAddress)
+            const totalSupply = await getTotalSupply(tokenAddress, TargetBlockNumber, decimals)
             const holdersWithBalances = await getHoldersBalancesAtBlock(tokenAddress, decimals, holders, TargetBlockNumber)
+            const totalCalculatedBalance = holdersWithBalances.reduce((prev, cur) => {
+                prev = prev.plus(new BigNumber(cur.balance))
+                return prev
+            }, new BigNumber(0))
+            console.log('calculated balance:',totalCalculatedBalance.toString(), 'totalSupply (rpc)', totalSupply)
             const reportFileName = `${reportsFolder}/token_${token.address}_block_${TargetBlockNumber}.csv`
             await writeHoldersToCsv(holdersWithBalances, reportFileName)
             console.log(`${token.name}: report ${reportFileName} created`)

@@ -25,8 +25,8 @@ const ERC20TokensList = [
 
 const BLOCK_FROM = 28115058
 const BLOCK_TO = 28697000
-const BALANCE_RANGE_FROM = 0.00000001
-const BALANCE_RANGE_TO = 1000000000
+const BALANCE_RANGE_FROM = 0
+const BALANCE_RANGE_TO = 10000000000000000
 
 const getErc20MapWithPrice = async () => {
     const erc20Map = {}
@@ -70,23 +70,54 @@ const getUserFromReport = async (blockNumber, token) => {
 }
 
 const getMatchedUsers = (arr1, arr2, tokenUsdPrice) => {
-    return arr1
-        .map(user1 => {
-            const user2 = arr2.find((user2) => user2.Address === user1.Address)
-            const balance1 = user1.Balance
-            const balance2 = user2 ? user2.Balance : 0
-            const balanceUSD1 = new BigNumber(balance1).multipliedBy(tokenUsdPrice)
-            const balanceUSD2 = new BigNumber(balance2).multipliedBy(tokenUsdPrice)
-            return {
-                Address: user1.Address,
-                [`Balance_${BLOCK_FROM}`]: balance1,
-                [`Balance_USD_${BLOCK_FROM}`]: balanceUSD1.toString(10),
-                [`Balance_${BLOCK_TO}`]: balance2,
-                [`Balance_USD_${BLOCK_TO}`]: balanceUSD2.toString(10),
-            }
-        })
-        .filter((user) => user[`Balance_${BLOCK_FROM}`] > 0 && user[`Balance_${BLOCK_TO}`] > 0)
-        .sort((a, b) => b[`Balance_${BLOCK_FROM}`] - a[`Balance_${BLOCK_FROM}`])
+    let usersMap = {}
+
+    arr1.forEach((user1) => {
+        const balance1 = user1.Balance
+        const balanceUSD1 = new BigNumber(balance1).multipliedBy(tokenUsdPrice)
+        usersMap[user1.Address] = {
+            Address: user1.Address,
+            [`Balance_${BLOCK_FROM}`]: balance1,
+            [`Balance_USD_${BLOCK_FROM}`]: balanceUSD1.toString(10),
+            [`Balance_${BLOCK_TO}`]: 0,
+            [`Balance_USD_${BLOCK_TO}`]: 0,
+        }
+    })
+
+    arr2.forEach((user2) => {
+        const balance2 = user2.Balance
+        const balanceUSD2 = new BigNumber(balance2).multipliedBy(tokenUsdPrice)
+        const existedUser = usersMap[user2.Address] || {
+            Address: user2.Address,
+            [`Balance_${BLOCK_FROM}`]: 0,
+            [`Balance_USD_${BLOCK_FROM}`]: 0,
+        }
+        usersMap[user2.Address] = {
+            ...existedUser,
+            [`Balance_${BLOCK_TO}`]: balance2,
+            [`Balance_USD_${BLOCK_TO}`]: balanceUSD2.toString(10),
+        }
+    })
+
+    return Object.values(usersMap).sort((a, b) => b[`Balance_${BLOCK_TO}`] - a[`Balance_${BLOCK_TO}`])
+
+    // return arr1
+    //     .map(user1 => {
+    //         const user2 = arr2.find((user2) => user2.Address === user1.Address)
+    //         const balance1 = user1.Balance
+    //         const balance2 = user2 ? user2.Balance : 0
+    //         const balanceUSD1 = new BigNumber(balance1).multipliedBy(tokenUsdPrice)
+    //         const balanceUSD2 = new BigNumber(balance2).multipliedBy(tokenUsdPrice)
+    //         return {
+    //             Address: user1.Address,
+    //             [`Balance_${BLOCK_FROM}`]: balance1,
+    //             [`Balance_USD_${BLOCK_FROM}`]: balanceUSD1.toString(10),
+    //             [`Balance_${BLOCK_TO}`]: balance2,
+    //             [`Balance_USD_${BLOCK_TO}`]: balanceUSD2.toString(10),
+    //         }
+    //     })
+    //     // .filter((user) => user[`Balance_${BLOCK_FROM}`] > 0 && user[`Balance_${BLOCK_TO}`] > 0)
+    //     .sort((a, b) => b[`Balance_${BLOCK_TO}`] - a[`Balance_${BLOCK_TO}`])
 }
 
 const writeHoldersToCsv = async (holders, filename) => {
@@ -117,20 +148,36 @@ const start = async () => {
         const usersCurrent = await getUserFromReport(BLOCK_TO, token)
         const stayedUsers = getMatchedUsers(usersPrev, usersCurrent, erc20Map[token.address].usdPrice)
 
-        const stayedWithBalances = stayedUsers
+        const supplyTo = usersCurrent.map(user => user.Balance)
+            .reduce((acc, item) => {
+                acc = acc.plus(new BigNumber(item))
+                return acc
+            }, new BigNumber(0))
+
+        const totalCurrentSupply = stayedUsers.map(user => user[`Balance_${BLOCK_TO}`])
+            .reduce((acc, item) => {
+                acc = acc.plus(new BigNumber(item))
+                return acc
+            }, new BigNumber(0))
+
+        const withBalances = stayedUsers
         .filter(user => {
             const usdBlockFrom = user[`Balance_USD_${BLOCK_FROM}`]
             const usdBlockTo = user[`Balance_USD_${BLOCK_TO}`]
-            const isUserBalanceDecreased = usdBlockFrom > usdBlockTo
-            const usdBalanceInRange = usdBlockFrom >= BALANCE_RANGE_FROM && usdBlockFrom < BALANCE_RANGE_TO &&
-                usdBlockTo >= BALANCE_RANGE_FROM && usdBlockTo < BALANCE_RANGE_TO
+            // const isUserBalanceDecreased = usdBlockFrom > usdBlockTo
+            const usdBalanceInRange =
+                (usdBlockFrom > BALANCE_RANGE_FROM && usdBlockFrom < BALANCE_RANGE_TO) ||
+                (usdBlockTo > BALANCE_RANGE_FROM && usdBlockTo < BALANCE_RANGE_TO)
             return usdBalanceInRange
         })
 
-        console.log(`${token.name}: stayed addresses ${stayedUsers.length}, stayed with balances $${BALANCE_RANGE_FROM} - $${BALANCE_RANGE_TO}: ${stayedWithBalances.length}`)
+        console.log(`${token.name}: total addresses ${stayedUsers.length}`)
+        console.log(`addresses with balances $${BALANCE_RANGE_FROM} - $${BALANCE_RANGE_TO}: ${withBalances.length}`)
+        console.log(`total supply: ${totalCurrentSupply.toString()}`)
+        console.log(`total to: ${supplyTo.toString()}`)
 
         const reportFileName = `${reportsFolder}/token_${token.name}_${token.address}_holders_${BLOCK_FROM}_${BLOCK_TO}.csv`
-        await writeHoldersToCsv(stayedWithBalances, reportFileName)
+        await writeHoldersToCsv(withBalances, reportFileName)
         console.log(`${token.name}: report ${reportFileName} created`)
     }
 }
